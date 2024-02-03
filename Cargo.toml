@@ -6,3 +6,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = { version = "*", features = [ "native-tls" ] }
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0.195", features = ["derive"] }
+serde_yaml = "0.9.30"
+url = "2.5.0"
+futures-util = "0.3.30"
+regex = "1.10.3"
+lazy_static = "1.4.0"
+async-stream = "0.3.5"
+twitch_client_rs = { path = "../twitch_client_rs" }
