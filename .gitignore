@@ -1,5 +1,5 @@
 /target
-bytebot.yaml
-bytebot.yml
+secrets.yaml
+secrets.yml
 commands.yaml
 commands.yml

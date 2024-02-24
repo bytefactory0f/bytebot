@@ -20,3 +20,4 @@ twitch_client_rs = { git = "https://github.com/bytefactory0f/twitch_client_rs", 
 #twitch_client_rs = { path = "../twitch_client_rs" }
 log = "0.4.20"
 env_logger = "0.11.2"
+config = "0.14.0"

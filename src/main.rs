@@ -1,10 +1,12 @@
 mod commands;
-mod config;
+mod settings;
 
 use commands::CommandConfig;
-use config::Config;
+use config::{Config, Environment, File};
 use log::{debug, error, info};
+use settings::Settings;
 use std::collections::HashMap;
+use std::env;
 use std::error::Error;
 use twitch_client_rs::credentials::Credentials;
 use twitch_client_rs::irc::IRCMessage;
@@ -16,22 +18,41 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .filter_level(log::LevelFilter::Info)
         .init();
 
-    let config_file = std::fs::File::open("bytebot.yaml")?;
-    let config: Config = serde_yaml::from_reader(config_file)?;
+    let home = env::var("HOME").unwrap_or_default();
 
-    let command_file = std::fs::File::open("commands.yaml")?;
-    let command_config: CommandConfig = serde_yaml::from_reader(command_file)?;
+    let settings = Config::builder()
+        .add_source(File::with_name("/etc/bytebot/secrets.yaml").required(false))
+        .add_source(
+            File::with_name(format!("{}/.config/bytebot/secrets.yaml", home).as_str())
+                .required(false),
+        )
+        .add_source(File::with_name("./secrets.yaml").required(false))
+        .add_source(Environment::default())
+        .build()?
+        .try_deserialize::<Settings>()?;
+
+    let command_config = Config::builder()
+        .add_source(File::with_name("/etc/bytebot/commands.yaml").required(false))
+        .add_source(
+            File::with_name(format!("{}/.config/bytebot/commands.yaml", home).as_str())
+                .required(false),
+        )
+        .add_source(File::with_name("./commands.yaml").required(false))
+        .add_source(Environment::default())
+        .build()?
+        .try_deserialize::<CommandConfig>()?;
+
     let commands = HashMap::from(command_config);
 
     let channel = "bytefactory";
 
     let credentials = Credentials {
-        refresh_token: config.refresh_token,
-        client_id: config.client_id,
-        client_secret: config.client_secret,
+        refresh_token: settings.refresh_token,
+        client_id: settings.client_id,
+        client_secret: settings.client_secret,
     };
 
-    let mut twitch_client = TwitchClient::new(credentials, config.nick, true);
+    let mut twitch_client = TwitchClient::new(credentials, settings.nick, true);
 
     // Get/refresh the access token
     twitch_client.update_access_token().await?;
