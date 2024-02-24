@@ -1,14 +1,17 @@
-use std::collections::HashMap;
 use serde::Deserialize;
+use std::collections::HashMap;
+use twitch_client_rs::irc::UserContext;
 
 #[derive(Deserialize)]
 pub struct CommandConfig {
-    pub commands: Vec<Command>
+    pub commands: Vec<Command>,
 }
 
 impl From<CommandConfig> for HashMap<String, Command> {
     fn from(value: CommandConfig) -> Self {
-        value.commands.into_iter()
+        value
+            .commands
+            .into_iter()
             .map(|c| (c.prompt.clone(), c))
             .collect()
     }
@@ -16,8 +19,9 @@ impl From<CommandConfig> for HashMap<String, Command> {
 
 #[derive(Deserialize)]
 pub enum Role {
+    Broadcaster,
     Mod,
-    User
+    User,
 }
 
 #[derive(Deserialize)]
@@ -27,28 +31,25 @@ pub struct Command {
     pub args: Option<Vec<String>>,
 
     /// Roles that that this command will be executed for
-    pub roles: Option<Vec<Role>>
+    pub roles: Option<Vec<Role>>,
 }
 
 impl Command {
-    fn is_permitted(&self, is_mod: bool) -> bool {
+    fn is_permitted(&self, user_context: UserContext) -> bool {
         match &self.roles {
-            Some(roles) => {
-                roles.iter()
-                    .map(|role| {
-                        match role {
-                            Role::Mod => is_mod,
-                            Role::User => true
-                        }
-                    })
-                    .any(|e| e)
-            },
-            None => true
+            Some(roles) => roles
+                .iter()
+                .any(|role| match role {
+                    Role::Broadcaster => user_context.is_broadcaster,
+                    Role::Mod => user_context.is_mod,
+                    Role::User => true,
+                }),
+            None => true,
         }
     }
 
-    pub fn get_reply(&self, values: &[&str], is_mod: bool) -> Option<String> {
-        if !self.is_permitted(is_mod) {
+    pub fn get_reply(&self, values: &[&str], user_context: UserContext) -> Option<String> {
+        if !self.is_permitted(user_context) {
             return None;
         }
 
@@ -63,7 +64,7 @@ impl Command {
 
                 Some(reply)
             }
-            None => Some(reply)
+            None => Some(reply),
         }
     }
 }

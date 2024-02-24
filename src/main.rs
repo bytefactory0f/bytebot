@@ -1,13 +1,13 @@
-mod config;
 mod commands;
+mod config;
 
-use std::error::Error;
-use std::collections::HashMap;
-use config::Config;
 use commands::CommandConfig;
-use twitch_client_rs::twitch_client::{TwitchClient, Capability};
-use twitch_client_rs::irc::IRCMessage;
+use config::Config;
+use std::collections::HashMap;
+use std::error::Error;
 use twitch_client_rs::credentials::Credentials;
+use twitch_client_rs::irc::IRCMessage;
+use twitch_client_rs::twitch_client::{Capability, TwitchClient};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -26,7 +26,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         client_secret: config.client_secret,
     };
 
-    let mut twitch_client = TwitchClient::new(credentials, config.nick)?;
+    let mut twitch_client = TwitchClient::new(credentials, config.nick, true);
 
     // Get/refresh the access token
     twitch_client.update_access_token().await?;
@@ -44,21 +44,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     while let Some(irc_message) = twitch_client.next().await {
         dbg!(&irc_message);
-        match irc_message? {
-            IRCMessage::Ping(msg) => {
-                println!("GOT PING: {msg}");
-                twitch_client.pong(msg.as_str()).await?;
-            },
-            IRCMessage::Privmsg { message, is_mod, .. } => {
-                if let Some((command_str, args)) = get_message_components(&message) {
-                    if let Some(command) = commands.get(command_str) {
-                        if let Some(reply) = command.get_reply(&args, is_mod) {
-                            twitch_client.privmsg(channel, &reply).await?
+
+        match irc_message {
+            Ok(message) => {
+                if let IRCMessage::Privmsg { message, user_context, .. } = message {
+                    if let Some((command_str, args)) = get_message_components(&message) {
+                        if let Some(command) = commands.get(command_str) {
+                            if let Some(reply) = command.get_reply(&args, user_context) {
+                                twitch_client.privmsg(channel, &reply).await?
+                            }
                         }
                     }
                 }
             }
-            _ => {}
+            Err(err) => {
+                println!("error: {}", err)
+            }
         }
     }
 
@@ -67,6 +68,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Splits a message into components, with the first component being
+/// treated as a potential command, and the rest as arguments to that
+/// command.
+/// Ex: !shoutout hello  world!
+///     command   arg[0] arg[1]
 fn get_message_components(message: &str) -> Option<(&str, Vec<&str>)> {
     let parts: Vec<&str> = message.split_whitespace().collect();
     let command_str = parts.first()?;
