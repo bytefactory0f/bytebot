@@ -37,13 +37,11 @@ pub struct Command {
 impl Command {
     fn is_permitted(&self, user_context: UserContext) -> bool {
         match &self.roles {
-            Some(roles) => roles
-                .iter()
-                .any(|role| match role {
-                    Role::Broadcaster => user_context.is_broadcaster,
-                    Role::Mod => user_context.is_mod,
-                    Role::User => true,
-                }),
+            Some(roles) => roles.iter().any(|role| match role {
+                Role::Broadcaster => user_context.is_broadcaster,
+                Role::Mod => user_context.is_mod,
+                Role::User => true,
+            }),
             None => true,
         }
     }

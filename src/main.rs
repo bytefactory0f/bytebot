@@ -3,6 +3,7 @@ mod config;
 
 use commands::CommandConfig;
 use config::Config;
+use log::{debug, error, info};
 use std::collections::HashMap;
 use std::error::Error;
 use twitch_client_rs::credentials::Credentials;
@@ -11,6 +12,10 @@ use twitch_client_rs::twitch_client::{Capability, TwitchClient};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .init();
+
     let config_file = std::fs::File::open("bytebot.yaml")?;
     let config: Config = serde_yaml::from_reader(config_file)?;
 
@@ -30,24 +35,32 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Get/refresh the access token
     twitch_client.update_access_token().await?;
+    debug!("refreshed access token");
 
     // Open a websocket connection to twitch
     twitch_client.connect().await?;
+    debug!("established websocket connection");
 
     // Authenticate with the twitch IRC server
     twitch_client.authenticate().await?;
+    debug!("successfully authenticated with the twitch IRC server");
 
     twitch_client.cap_req(&[Capability::Tags]).await?;
 
     // Joint a twitch chat
     twitch_client.join(channel).await?;
+    info!("Now connected to channel: #{channel}");
 
     while let Some(irc_message) = twitch_client.next().await {
-        dbg!(&irc_message);
-
         match irc_message {
             Ok(message) => {
-                if let IRCMessage::Privmsg { message, user_context, .. } = message {
+                if let IRCMessage::Privmsg {
+                    message,
+                    user_context,
+                    ..
+                } = message
+                {
+                    info!("Got message: {}", message);
                     if let Some((command_str, args)) = get_message_components(&message) {
                         if let Some(command) = commands.get(command_str) {
                             if let Some(reply) = command.get_reply(&args, user_context) {
@@ -58,13 +71,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
             Err(err) => {
-                println!("error: {}", err)
+                error!("Error handling message: {}", err);
             }
         }
     }
 
-    println!("DONE");
-
+    info!("Shutting down!");
     Ok(())
 }
 

@@ -17,3 +17,5 @@ regex = "1.10.3"
 lazy_static = "1.4.0"
 async-stream = "0.3.5"
 twitch_client_rs = { path = "../twitch_client_rs" }
+log = "0.4.20"
+env_logger = "0.11.2"
